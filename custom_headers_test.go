@@ -1,5 +1,5 @@
 // nolint
-package traefik_plugin_mutate_headers
+package traefik_plugin_insert_custom_header
 
 import (
 	"context"
