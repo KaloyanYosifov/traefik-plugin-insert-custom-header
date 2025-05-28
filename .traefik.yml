@@ -1,0 +1,15 @@
+displayName: Mutate Headers
+summary: Mutates a header using regex capture groups. Also allows capturing specific elements from url
+type: middleware
+import: github.com/KaloyanYosifov/traefik-plugin-insert-custom-header
+
+testData:
+  mutations:
+    - header: Host
+      newName: X-Implied-Host
+      regex: "^(.+).some.host"
+      replacement: "$1"
+  fromUrlMutations:
+    - newName: X-Implied-Host-From-Url
+      regex: "^(.+).some.host"
+      replacement: "$1"
