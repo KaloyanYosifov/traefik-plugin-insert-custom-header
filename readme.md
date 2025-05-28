@@ -26,5 +26,5 @@ experimental:
   plugins:
     traefik-plugin-mutate-headers:
       modulename: "https://github.com/KaloyanYosifov/traefik-plugin-insert-custom-header"
-      version: "v1.0.0"
+      version: "v0.1.0"
 ```
