@@ -3,6 +3,7 @@ package traefik_plugin_insert_custom_header
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,10 +11,11 @@ import (
 
 func TestHeaderMutator(t *testing.T) {
 	tests := []struct {
-		desc          string
-		mutations     []Mutation
-		reqHeader     http.Header
-		expRespHeader http.Header
+		desc             string
+		mutations        []Mutation
+		fromUrlMutations []FromUrlMutation
+		reqHeader        http.Header
+		expRespHeader    http.Header
 	}{
 		{
 			desc: "should replace foo by bar in location header",
@@ -24,6 +26,7 @@ func TestHeaderMutator(t *testing.T) {
 					Replacement: "bar",
 				},
 			},
+			fromUrlMutations: []FromUrlMutation{},
 			reqHeader: map[string][]string{
 				"Location": {"foo", "anotherfoo"},
 			},
@@ -40,6 +43,7 @@ func TestHeaderMutator(t *testing.T) {
 					Replacement: "https://$1",
 				},
 			},
+			fromUrlMutations: []FromUrlMutation{},
 			reqHeader: map[string][]string{
 				"Location": {"http://test:1000"},
 			},
@@ -57,6 +61,7 @@ func TestHeaderMutator(t *testing.T) {
 					Replacement: "$1",
 				},
 			},
+			fromUrlMutations: []FromUrlMutation{},
 			reqHeader: map[string][]string{
 				"host": {"example.com"},
 			},
@@ -75,6 +80,7 @@ func TestHeaderMutator(t *testing.T) {
 					Replacement: "$1",
 				},
 			},
+			fromUrlMutations: []FromUrlMutation{},
 			reqHeader: map[string][]string{
 				"host": {"example.com.test.com"},
 			},
@@ -93,6 +99,7 @@ func TestHeaderMutator(t *testing.T) {
 					Replacement: "$1",
 				},
 			},
+			fromUrlMutations: []FromUrlMutation{},
 			reqHeader: map[string][]string{
 				"host": {"example.com.test.com"},
 			},
@@ -108,6 +115,7 @@ func TestHeaderMutator(t *testing.T) {
 					NewName: "X-Host",
 				},
 			},
+			fromUrlMutations: []FromUrlMutation{},
 			reqHeader: map[string][]string{
 				"host": {"example.com"},
 			},
@@ -123,6 +131,7 @@ func TestHeaderMutator(t *testing.T) {
 					NewName: "X-Host",
 				},
 			},
+			fromUrlMutations: []FromUrlMutation{},
 			reqHeader: map[string][]string{
 				"host": {"example.com"},
 			},
@@ -141,6 +150,7 @@ func TestHeaderMutator(t *testing.T) {
 					Replacement: "$1",
 				},
 			},
+			fromUrlMutations: []FromUrlMutation{},
 			reqHeader: map[string][]string{
 				"host": {"example.com"},
 			},
@@ -149,11 +159,67 @@ func TestHeaderMutator(t *testing.T) {
 				"X-Host": {"example.com"},
 			},
 		},
+		{
+			desc: "preserve the value if regex does not match",
+			mutations: []Mutation{
+				{
+					Header:      "Host",
+					NewName:     "X-Host",
+					Regex:       "^(.+)\\.test\\.com$",
+					Replacement: "$1",
+				},
+			},
+			fromUrlMutations: []FromUrlMutation{},
+			reqHeader: map[string][]string{
+				"host": {"example.com"},
+			},
+			expRespHeader: map[string][]string{
+				"host":   {"example.com"},
+				"X-Host": {"example.com"},
+			},
+		},
+		{
+			desc:      "creates new header from url parsing",
+			mutations: []Mutation{},
+			fromUrlMutations: []FromUrlMutation{
+				{
+					NewName:     "New_Header",
+					Regex:       "^http://(.+)\\.com/(.+)$",
+					Replacement: "$1-$2",
+				},
+			},
+			reqHeader: map[string][]string{
+				"host": {"example.com"},
+			},
+			expRespHeader: map[string][]string{
+				"host":       {"example.com"},
+				"New_Header": {"example-test"},
+			},
+		},
+		{
+			desc:      "creates new header from url with whatever the url is, if regex does not match",
+			mutations: []Mutation{},
+			fromUrlMutations: []FromUrlMutation{
+				{
+					NewName:     "New_Header",
+					Regex:       "^(.+)\\.test\\.com$",
+					Replacement: "$1",
+				},
+			},
+			reqHeader: map[string][]string{
+				"host": {"example.com"},
+			},
+			expRespHeader: map[string][]string{
+				"host":       {"example.com"},
+				"New_Header": {"http://example.com/test"},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			config := &Config{
-				Mutations: test.mutations,
+				Mutations:        test.mutations,
+				FromUrlMutations: test.fromUrlMutations,
 			}
 
 			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
@@ -162,9 +228,10 @@ func TestHeaderMutator(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			r := httptest.NewRequest(http.MethodGet, "/test", nil)
 			w := httptest.NewRecorder()
 
+			fmt.Println(r.URL.RequestURI())
 			for k, v := range test.reqHeader {
 				for _, h := range v {
 					r.Header.Add(k, h)

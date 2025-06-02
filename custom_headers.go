@@ -109,6 +109,15 @@ func New(_ context.Context, next http.Handler, config *Config, name string) (htt
 	}, nil
 }
 
+func fullRequestURL(req *http.Request) string {
+	scheme := "http"
+	if req.TLS != nil {
+		scheme = "https"
+	}
+
+	return fmt.Sprintf("%s://%s%s", scheme, req.Host, req.URL.RequestURI())
+}
+
 func (h *HeaderMutator) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	for _, m := range h.mutations {
 		// skip if it's not a mutation or cloning
@@ -148,14 +157,14 @@ func (h *HeaderMutator) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	url := fullRequestURL(req)
 	for _, m := range h.fromUrlMutations {
-		v := req.URL.String()
-		mv := m.regex.ReplaceAllString(v, m.replacement)
+		mv := m.regex.ReplaceAllString(url, m.replacement)
 
 		if mv != "" {
 			req.Header.Add(m.newName, mv)
 		} else {
-			req.Header.Add(m.newName, v)
+			req.Header.Add(m.newName, url)
 		}
 	}
 
