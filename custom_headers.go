@@ -79,8 +79,9 @@ func New(_ context.Context, next http.Handler, config *Config, name string) (htt
 		mutations[i] = mt
 	}
 
+	fromUrlMutations := make([]fromUrlMutation, len(config.FromUrlMutations))
 	for i, m := range config.FromUrlMutations {
-		mt := mutation{newName: m.NewName}
+		mt := fromUrlMutation{newName: m.NewName}
 		if m.Regex == "" {
 			return nil, fmt.Errorf("regex for url mutation cannot be empty")
 		}
@@ -97,13 +98,14 @@ func New(_ context.Context, next http.Handler, config *Config, name string) (htt
 		mt.regex = regex
 		mt.replacement = m.Replacement
 
-		mutations[i] = mt
+		fromUrlMutations[i] = mt
 	}
 
 	return &HeaderMutator{
-		name:      name,
-		next:      next,
-		mutations: mutations,
+		name:             name,
+		next:             next,
+		mutations:        mutations,
+		fromUrlMutations: fromUrlMutations,
 	}, nil
 }
 
